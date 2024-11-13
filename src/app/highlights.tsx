@@ -1,26 +1,27 @@
 "use client";
 
-import {
-  DndContext,
-  PointerSensor,
-  closestCenter,
-  useSensor,
-  useSensors,
-} from "@dnd-kit/core";
-import {
-  SortableContext,
-  arrayMove,
-  useSortable,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
 import React, { useEffect, useState } from "react";
 import {
-  addHighlight,
-  deleteHighlight,
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import {
   getHighlights,
-  reorderHighlights,
+  addHighlight,
   updateHighlight,
+  deleteHighlight,
+  reorderHighlights,
 } from "./highlightsApi";
 
 type Highlight = {
@@ -103,8 +104,10 @@ const Highlights: React.FC = () => {
   const sensors = useSensors(useSensor(PointerSensor));
 
   // Handle drag end to reorder items
-  const handleDragEnd = ({ active, over }: any) => {
-    if (active.id !== over.id) {
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (active.id !== over?.id) {
       setHighlights((prev) => {
         const oldIndex = prev.findIndex((item) => item.id === active.id);
         const newIndex = prev.findIndex((item) => item.id === over.id);
@@ -119,10 +122,6 @@ const Highlights: React.FC = () => {
   const handleAddHighlight = async () => {
     try {
       const newHighlight = await addHighlight("New highlight text");
-
-      // Ensure the new highlight has a unique ID
-      newHighlight.id = `${Date.now()}`;
-
       setHighlights((prev) => [...prev, newHighlight]);
     } catch (error) {
       console.error("Error adding highlight:", error);
