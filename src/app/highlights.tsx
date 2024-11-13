@@ -1,23 +1,86 @@
 "use client";
 
+import {
+  DndContext,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import React, { useEffect, useState } from "react";
 import {
-  DragDropContext,
-  Droppable,
-  Draggable,
-  DropResult,
-} from "react-beautiful-dnd";
-import {
-  getHighlights,
   addHighlight,
-  updateHighlight,
   deleteHighlight,
+  getHighlights,
   reorderHighlights,
+  updateHighlight,
 } from "./highlightsApi";
 
 type Highlight = {
   id: string;
   text: string;
+};
+
+// SortableItem component to make each item draggable only when clicking on the order icon
+const SortableItem = ({
+  highlight,
+  onEdit,
+  onDelete,
+}: {
+  highlight: Highlight;
+  onEdit: (id: string, text: string) => void;
+  onDelete: (id: string) => void;
+}) => {
+  const { attributes, listeners, setNodeRef, transform, transition } =
+    useSortable({
+      id: highlight.id,
+    });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    padding: "22px 8px",
+    border: "1px solid #ddd",
+    backgroundColor: "white",
+    display: "flex",
+    alignItems: "center",
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} {...attributes}>
+      {/* Draggable Icon - Apply drag listeners here */}
+      <img
+        src="/order.svg"
+        alt="Drag to reorder"
+        className="mr-3 h-5 w-5 cursor-move"
+        {...listeners} // Apply listeners here
+      />
+
+      {/* Highlight Text Input */}
+      <input
+        type="text"
+        value={highlight.text}
+        onChange={(e) => onEdit(highlight.id, e.target.value)}
+        className="flex-1 p-2 border border-gray-300 rounded text-[14px] text-[#4E5864]"
+      />
+
+      {/* Delete Button */}
+      <button
+        onClick={() => onDelete(highlight.id)}
+        className="ml-2"
+        aria-label="Delete highlight"
+      >
+        <img src="/recycle.svg" alt="Delete" className="h-5 w-5" />
+      </button>
+    </div>
+  );
 };
 
 const Highlights: React.FC = () => {
@@ -28,7 +91,6 @@ const Highlights: React.FC = () => {
     const fetchHighlights = async () => {
       try {
         const data = await getHighlights();
-        console.log("Setting highlights:", data); // Add this line
         setHighlights(data);
       } catch (error) {
         console.error("Error fetching highlights:", error);
@@ -37,10 +99,30 @@ const Highlights: React.FC = () => {
     fetchHighlights();
   }, []);
 
+  // Sensors for drag and drop
+  const sensors = useSensors(useSensor(PointerSensor));
+
+  // Handle drag end to reorder items
+  const handleDragEnd = ({ active, over }: any) => {
+    if (active.id !== over.id) {
+      setHighlights((prev) => {
+        const oldIndex = prev.findIndex((item) => item.id === active.id);
+        const newIndex = prev.findIndex((item) => item.id === over.id);
+        const reordered = arrayMove(prev, oldIndex, newIndex);
+        reorderHighlights(reordered); // Send reordered list to the backend
+        return reordered;
+      });
+    }
+  };
+
   // Add a new highlight
   const handleAddHighlight = async () => {
     try {
       const newHighlight = await addHighlight("New highlight text");
+
+      // Ensure the new highlight has a unique ID
+      newHighlight.id = `${Date.now()}`;
+
       setHighlights((prev) => [...prev, newHighlight]);
     } catch (error) {
       console.error("Error adding highlight:", error);
@@ -64,25 +146,6 @@ const Highlights: React.FC = () => {
       setHighlights((prev) => prev.filter((highlight) => highlight.id !== id));
     } catch (error) {
       console.error("Error deleting highlight:", error);
-    }
-  };
-
-  // Reorder highlights on drag and drop
-  const handleOnDragEnd = async (result: DropResult) => {
-    if (!result.destination) return;
-
-    const reorderedHighlights = Array.from(highlights);
-    const [reorderedItem] = reorderedHighlights.splice(result.source.index, 1);
-    reorderedHighlights.splice(result.destination.index, 0, reorderedItem);
-
-    // Update highlights locally for instant feedback
-    setHighlights(reorderedHighlights);
-
-    // Send the reordered highlights to the backend
-    try {
-      await reorderHighlights(reorderedHighlights);
-    } catch (error) {
-      console.error("Error reordering highlights:", error);
     }
   };
 
@@ -110,62 +173,25 @@ const Highlights: React.FC = () => {
         </button>
       </div>
 
-      {/* Drag and Drop Context */}
-      <DragDropContext onDragEnd={handleOnDragEnd}>
-        <Droppable droppableId="highlights">
-          {(provided) => (
-            <div {...provided.droppableProps} ref={provided.innerRef}>
-              {highlights.map((highlight, index) => (
-                <Draggable
-                  key={highlight.id}
-                  draggableId={highlight.id}
-                  index={index}
-                >
-                  {(provided) => (
-                    <div
-                      ref={provided.innerRef}
-                      {...provided.draggableProps}
-                      {...provided.dragHandleProps}
-                      className="flex items-center p-4 border border-gray-200"
-                    >
-                      {/* Draggable Icon */}
-                      <img
-                        src="/order.svg"
-                        alt="Drag to reorder"
-                        className="mr-3 h-5 w-5 cursor-move"
-                      />
-
-                      {/* Highlight Text Input */}
-                      <input
-                        type="text"
-                        value={highlight.text}
-                        onChange={(e) =>
-                          handleEditHighlight(highlight.id, e.target.value)
-                        }
-                        className="flex-1 p-2 border border-gray-300 rounded text-[14px] text-[#4E5864]"
-                      />
-
-                      {/* Delete Button */}
-                      <button
-                        onClick={() => handleDeleteHighlight(highlight.id)}
-                        className="ml-3"
-                        aria-label="Delete highlight"
-                      >
-                        <img
-                          src="/recycle.svg"
-                          alt="Delete"
-                          className="h-5 w-5"
-                        />
-                      </button>
-                    </div>
-                  )}
-                </Draggable>
-              ))}
-              {provided.placeholder}
-            </div>
-          )}
-        </Droppable>
-      </DragDropContext>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleDragEnd}
+      >
+        <SortableContext
+          items={highlights.map((item) => item.id)}
+          strategy={verticalListSortingStrategy}
+        >
+          {highlights.map((highlight) => (
+            <SortableItem
+              key={highlight.id}
+              highlight={highlight}
+              onEdit={handleEditHighlight}
+              onDelete={handleDeleteHighlight}
+            />
+          ))}
+        </SortableContext>
+      </DndContext>
     </div>
   );
 };
