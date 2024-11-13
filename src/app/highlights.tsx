@@ -49,18 +49,12 @@ const Highlights: React.FC = () => {
 
   // Edit an existing highlight
   const handleEditHighlight = async (id: string, newText: string) => {
-    try {
-      const updatedHighlight = await updateHighlight(id, newText);
-      setHighlights((prev) =>
-        prev.map((highlight) =>
-          highlight.id === id
-            ? { ...highlight, text: updatedHighlight.text }
-            : highlight
-        )
-      );
-    } catch (error) {
-      console.error("Error updating highlight:", error);
-    }
+    setHighlights((prev) =>
+      prev.map((highlight) =>
+        highlight.id === id ? { ...highlight, text: newText } : highlight
+      )
+    );
+    updateHighlight(id, newText);
   };
 
   // Delete a highlight
