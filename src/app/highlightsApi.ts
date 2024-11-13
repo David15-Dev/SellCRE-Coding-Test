@@ -2,7 +2,7 @@
 import axios from "axios";
 
 // Define the base URL for the API
-const API_URL = "http://localhost:5000/api";
+const API_URL = "https://sellcre-be.onrender.com/api";
 
 // Define the Highlight type
 export interface Highlight {
